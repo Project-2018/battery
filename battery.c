@@ -120,7 +120,7 @@ static THD_FUNCTION(BattManager, arg) {
     /*
      *  Timing period is 10 ms
      */
-    chThdSleepUntil(time += MS2ST(100));
+    chThdSleepUntil(time += TIME_MS2I(100));
   }
 }
 
