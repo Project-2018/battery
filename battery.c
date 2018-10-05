@@ -1,6 +1,8 @@
 #include "ch.h"
 #include "hal.h"
 #include "battery.h"
+#include "syslog.h"
+#include <math.h>
 
 BatteryConfig_t *BatteryConfig;
 
@@ -13,6 +15,10 @@ uint16_t CalibCounter = 0;
 uint16_t ChargeTimeLeftMin = 0;
 
 uint16_t SecCounter = 0;
+
+float LastChgVoltage = 0.0f;
+
+bool LowSocAlarm = false;
 
 float multiMap(float val, float* _in, float* _out, uint16_t size)
 {
@@ -67,7 +73,7 @@ static THD_FUNCTION(BattManager, arg) {
 
   	}
 
-  	if(ChgVoltage > BatteryConfig->MinChgVoltage && BatteryState != BATTERY_CHARGE){
+  	if(ChgVoltage > BatteryConfig->MinChgVoltage && BatteryState != BATTERY_CHARGE && BatteryState != BATTERY_CHARGE_FINISHED){
   		BatteryState = BATTERY_BEGIN_CHRAGE;
   	}
 
@@ -86,13 +92,24 @@ static THD_FUNCTION(BattManager, arg) {
   		break;
   		case BATTERY_DISCHARGE:
   			CalibCounter = 0;
+        if(LowSocAlarm == false && GetStateOfCharge() <= 1)
+        {
+          ADD_SYSLOG(SYSLOG_WARN, "Battery", "Low SOC.(%d, %.2fV)", (uint8_t)(StateOfCharge*100), BattVoltage);
+          LowSocAlarm = true;
+        }
 
   		break;
   		case BATTERY_BEGIN_CHRAGE:
-  			SecCounter = 0;
-  			ChargeTimeLeftMin = (uint16_t)((1.0f - StateOfCharge) * ((float)BatteryConfig->TimeToFullChargeInMin * (1 / (ChgVoltage / 10.0f)))); 	//Calculate charge left time
-  			BatteryState = BATTERY_CHARGE;
-        CalibCounter = BatteryConfig->MinTimeBeforecalib;
+        
+        if(fabs(ChgVoltage - LastChgVoltage) < CHGVOLTAGE_STABLE_LIMIT){
+          SecCounter = 0;
+          ChargeTimeLeftMin = (uint16_t)((1.0f - StateOfCharge) * ((float)BatteryConfig->TimeToFullChargeInMin * (1 / (ChgVoltage / 10.0f))));  //Calculate charge left time
+          BatteryState = BATTERY_CHARGE;
+          CalibCounter = BatteryConfig->MinTimeBeforecalib;
+          ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging started.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
+          LastChgVoltage = 0.0f;
+        }
+        LastChgVoltage = ChgVoltage;
 
   		break;
   		case BATTERY_CHARGE:
@@ -105,6 +122,8 @@ static THD_FUNCTION(BattManager, arg) {
 
   			if(BattVoltage > BatteryConfig->ChgReadyVoltage){
   				BatteryState = BATTERY_CHARGE_FINISHED;
+          CalibrateSOC(BattVoltage);
+          ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging finished.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
   			}
 
   		break;
@@ -116,11 +135,7 @@ static THD_FUNCTION(BattManager, arg) {
   	}
 
 
-
-    /*
-     *  Timing period is 10 ms
-     */
-    chThdSleepUntil(time += TIME_MS2I(100));
+    chThdSleepMilliseconds(100);
   }
 }
 
@@ -135,6 +150,19 @@ BatteryInit_t InitBatteryManagement(BatteryConfig_t *_config){
 
 }
 
+bool IsBatteryInCharging(void){
+  if(BatteryState == BATTERY_BEGIN_CHRAGE || BatteryState == BATTERY_CHARGE || BatteryState == BATTERY_CHARGE_FINISHED)
+    return true;
+
+  return false;
+}
+
+bool IsDischargeAllowed(void){
+  if(IsBatteryInCharging() == true)
+    return false;
+
+  return true;
+}
 
 BatteryState_t GetBatteryState(void){
 	return BatteryState;

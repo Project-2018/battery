@@ -1,6 +1,7 @@
 #ifndef BATTERY_HPP
 #define BATTERY_HPP
 
+#define CHGVOLTAGE_STABLE_LIMIT	0.2f
 
 typedef enum{
 	BATTERY_DISCHARGE		= 0,
@@ -33,6 +34,8 @@ BatteryState_t GetBatteryState(void);
 uint16_t GetChargeTimeLeftMin(void);
 uint8_t GetStateOfCharge(void);
 float* GetSOCptr(void);
+bool IsDischargeAllowed(void);
+bool IsBatteryInCharging(void);
 
 
 #endif
