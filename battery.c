@@ -50,6 +50,8 @@ static THD_FUNCTION(BattManager, arg) {
   (void)arg;
   chRegSetThreadName("BattManager");
 
+  chThdSleepMilliseconds(100);
+
   float BattCurrent = 0.0f;
   float ChgVoltage = 0.0f;
   float BattVoltage = BatteryConfig->GetBatteryVoltage();
