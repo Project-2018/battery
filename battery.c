@@ -43,7 +43,7 @@ void CalibrateSOC(float voltage){
   StateOfCharge = val / 100;
 }
 
-static THD_WORKING_AREA(waBattManager, 128);
+static THD_WORKING_AREA(waBattManager, 1024);
 static THD_FUNCTION(BattManager, arg) {
   systime_t time;                   
 
@@ -76,6 +76,7 @@ static THD_FUNCTION(BattManager, arg) {
   	}
 
   	if(ChgVoltage > BatteryConfig->MinChgVoltage && BatteryState != BATTERY_CHARGE && BatteryState != BATTERY_CHARGE_FINISHED){
+      ChargeTimeLeftMin = 1;
   		BatteryState = BATTERY_BEGIN_CHRAGE;
   	}
 
@@ -106,6 +107,10 @@ static THD_FUNCTION(BattManager, arg) {
         if(fabs(ChgVoltage - LastChgVoltage) < CHGVOLTAGE_STABLE_LIMIT){
           SecCounter = 0;
           ChargeTimeLeftMin = (uint16_t)((1.0f - StateOfCharge) * ((float)BatteryConfig->TimeToFullChargeInMin * (1 / (ChgVoltage / 10.0f))));  //Calculate charge left time
+
+          if(ChargeTimeLeftMin == 0)
+            ChargeTimeLeftMin = 1;
+          
           BatteryState = BATTERY_CHARGE;
           CalibCounter = BatteryConfig->MinTimeBeforecalib;
           ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging started.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
@@ -118,12 +123,13 @@ static THD_FUNCTION(BattManager, arg) {
   			SecCounter++;
   			if(SecCounter > 600){
   				SecCounter = 0;
-  				if(ChargeTimeLeftMin != 0)
+  				if(ChargeTimeLeftMin > 1)
   					ChargeTimeLeftMin--;
   			}
 
   			if(BattVoltage > BatteryConfig->ChgReadyVoltage){
   				BatteryState = BATTERY_CHARGE_FINISHED;
+          ChargeTimeLeftMin = 0;
           CalibrateSOC(BattVoltage);
           ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging finished.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
   			}
@@ -145,6 +151,8 @@ static THD_FUNCTION(BattManager, arg) {
 BatteryInit_t InitBatteryManagement(BatteryConfig_t *_config){
 
 	BatteryConfig = _config;
+
+  CalibrateSOC(BatteryConfig->GetBatteryVoltage());
 
 	chThdCreateStatic(waBattManager, sizeof(waBattManager), NORMALPRIO, BattManager, NULL);
 
