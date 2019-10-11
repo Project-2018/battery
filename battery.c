@@ -113,7 +113,7 @@ static THD_FUNCTION(BattManager, arg) {
           
           BatteryState = BATTERY_CHARGE;
           CalibCounter = BatteryConfig->MinTimeBeforecalib;
-          ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging started.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
+          //ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging started.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
           LastChgVoltage = 0.0f;
         }
         LastChgVoltage = ChgVoltage;
@@ -131,7 +131,7 @@ static THD_FUNCTION(BattManager, arg) {
   				BatteryState = BATTERY_CHARGE_FINISHED;
           ChargeTimeLeftMin = 0;
           CalibrateSOC(BattVoltage);
-          ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging finished.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
+          //ADD_SYSLOG(SYSLOG_INFO, "Battery", "Charging finished.(%.2fV, %d, %dm, %.2fV)", ChgVoltage, (uint8_t)(StateOfCharge*100), ChargeTimeLeftMin, BattVoltage);
   			}
 
   		break;
